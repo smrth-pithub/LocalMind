@@ -167,6 +167,13 @@ def run_tray():
     )
     icon.run()
 
+def setup_hotkey():
+    import keyboard
+    keyboard.add_hotkey('ctrl+shift+space', lambda: threading.Thread(target=open_window, daemon=True).start())
+    keyboard.wait()
+
 if __name__ == "__main__":
     print("LocalMind starting...")
+    print("Hotkey: Ctrl+Shift+Space to open")
+    threading.Thread(target=setup_hotkey, daemon=True).start()
     run_tray()
