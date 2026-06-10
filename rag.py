@@ -1,0 +1,86 @@
+import chromadb
+from sentence_transformers import SentenceTransformer
+from pypdf import PdfReader
+import ollama
+import os
+
+# Initialize embedding model and ChromaDB
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
+client = chromadb.PersistentClient(path="./localmind_db")
+
+def load_pdf(pdf_path):
+    """Load a PDF and store chunks in ChromaDB"""
+    collection_name = os.path.basename(pdf_path).replace('.', '_').replace(' ', '_')
+    
+    # Delete existing collection if it exists
+    try:
+        client.delete_collection(collection_name)
+    except:
+        pass
+    
+    collection = client.create_collection(collection_name)
+    
+    # Extract text from PDF
+    reader = PdfReader(pdf_path)
+    chunks = []
+    for i, page in enumerate(reader.pages):
+        text = page.extract_text()
+        if text.strip():
+            chunks.append({"text": text, "page": i+1})
+    
+    # Embed and store
+    for i, chunk in enumerate(chunks):
+        embedding = embedder.encode(chunk["text"]).tolist()
+        collection.add(
+            documents=[chunk["text"]],
+            embeddings=[embedding],
+            ids=[f"page_{chunk['page']}"],
+            metadatas=[{"page": chunk["page"]}]
+        )
+    
+    print(f"Loaded {len(chunks)} pages from {pdf_path}")
+    return collection_name, len(chunks)
+
+def query_document(collection_name, question, n_results=3):
+    """Query the document and get LLM answer"""
+    collection = client.get_collection(collection_name)
+    
+    # Embed the question
+    question_embedding = embedder.encode(question).tolist()
+    
+    # Find relevant chunks
+    results = collection.query(
+        query_embeddings=[question_embedding],
+        n_results=n_results
+    )
+    
+    context = "\n\n".join(results['documents'][0])
+    
+    prompt = f"""You are a helpful assistant. Answer the question based only on the context provided below.
+If the answer is not in the context, say "I couldn't find that in the document."
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+    
+    response = ollama.chat(model='llama3.1', messages=[
+        {'role': 'user', 'content': prompt}
+    ])
+    
+    return response['message']['content']
+
+if __name__ == "__main__":
+    # Quick test
+    pdf_path = input("Enter PDF path to test: ")
+    collection_name, pages = load_pdf(pdf_path)
+    print(f"Loaded {pages} pages")
+    
+    while True:
+        question = input("Ask a question (or 'quit'): ")
+        if question == 'quit':
+            break
+        answer = query_document(collection_name, question)
+        print(f"\nAnswer: {answer}\n")
