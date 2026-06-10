@@ -2,10 +2,12 @@ import pystray
 from PIL import Image, ImageDraw, ImageGrab
 import threading
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import scrolledtext, filedialog
 import ollama
 import pytesseract
 import ctypes
+import os
+from rag import load_pdf, query_document
 
 ctypes.windll.shcore.SetProcessDpiAwareness(2)
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -74,14 +76,43 @@ def ask_llm(prompt):
 def open_window():
     win = tk.Tk()
     win.title("LocalMind")
-    win.geometry("700x500")
+    win.geometry("700x550")
     win.configure(bg="#1e1e1e")
 
     # Output area
     output = scrolledtext.ScrolledText(win, wrap=tk.WORD, bg="#2d2d2d", fg="white", font=("Consolas", 11))
     output.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-    # Button bar
+    # Document state
+    current_collection = [None]
+
+    # Document bar
+    doc_frame = tk.Frame(win, bg="#1e1e1e")
+    doc_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+
+    doc_label = tk.Label(doc_frame, text="No document loaded", bg="#1e1e1e", fg="#888888", font=("Consolas", 10))
+    doc_label.pack(side=tk.LEFT, padx=4)
+
+    def load_document():
+        path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
+        if not path:
+            return
+        output.insert(tk.END, f"[Loading document...]\n")
+        win.update()
+
+        def do_load():
+            collection_name, pages = load_pdf(path)
+            current_collection[0] = collection_name
+            doc_label.config(text=f"📄 {os.path.basename(path)} ({pages} pages)", fg="#00cc66")
+            output.insert(tk.END, f"[Document loaded: {pages} pages — ask questions about it in the chat]\n\n")
+            output.see(tk.END)
+
+        threading.Thread(target=do_load, daemon=True).start()
+
+    tk.Button(doc_frame, text="Load Document", command=load_document,
+        bg="#2d8a4e", fg="white", font=("Consolas", 10), bd=0, padx=10, pady=5).pack(side=tk.LEFT, padx=4)
+
+    # Action buttons
     btn_frame = tk.Frame(win, bg="#1e1e1e")
     btn_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
 
@@ -122,6 +153,8 @@ def open_window():
     # Chat input
     entry = tk.Entry(win, bg="#3d3d3d", fg="white", font=("Consolas", 11))
     entry.pack(fill=tk.X, padx=10, pady=(0, 10))
+    entry.insert(0, "Ask anything or load a document above...")
+    entry.bind("<FocusIn>", lambda e: entry.delete(0, tk.END))
 
     def submit(event=None):
         prompt = entry.get()
@@ -133,7 +166,10 @@ def open_window():
         win.update()
 
         def get_response():
-            reply = ask_llm(prompt)
+            if current_collection[0]:
+                reply = query_document(current_collection[0], prompt)
+            else:
+                reply = ask_llm(prompt)
             output.insert(tk.END, f"LocalMind: {reply}\n\n")
             output.see(tk.END)
 
