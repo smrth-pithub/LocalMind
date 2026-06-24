@@ -214,6 +214,10 @@ def setup_hotkey():
     keyboard.wait()
 
 if __name__ == "__main__":
+    from auth import authenticate
+    if not authenticate():
+        print("Authentication failed. Exiting.")
+        exit()
     print("LocalMind starting...")
     print("Hotkey: Ctrl+Shift+Space to open")
     threading.Thread(target=setup_hotkey, daemon=True).start()

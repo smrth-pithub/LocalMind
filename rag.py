@@ -4,15 +4,29 @@ from pypdf import PdfReader
 import ollama
 import os
 
-# Initialize embedding model and ChromaDB
-embedder = SentenceTransformer('all-MiniLM-L6-v2')
-client = chromadb.PersistentClient(path="./localmind_db")
+_embedder = None
+_client = None
+
+def get_embedder():
+    global _embedder
+    if _embedder is None:
+        print("Loading embedding model...")
+        _embedder = SentenceTransformer('all-MiniLM-L6-v2')
+    return _embedder
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = chromadb.PersistentClient(path="./localmind_db")
+    return _client
 
 def load_pdf(pdf_path):
     """Load a PDF and store chunks in ChromaDB"""
     collection_name = os.path.basename(pdf_path).replace('.', '_').replace(' ', '_')
     
-    # Delete existing collection if it exists
+    client = get_client()
+    embedder = get_embedder()
+
     try:
         client.delete_collection(collection_name)
     except:
@@ -20,7 +34,6 @@ def load_pdf(pdf_path):
     
     collection = client.create_collection(collection_name)
     
-    # Extract text from PDF
     reader = PdfReader(pdf_path)
     chunks = []
     for i, page in enumerate(reader.pages):
@@ -28,7 +41,6 @@ def load_pdf(pdf_path):
         if text.strip():
             chunks.append({"text": text, "page": i+1})
     
-    # Embed and store
     for i, chunk in enumerate(chunks):
         embedding = embedder.encode(chunk["text"]).tolist()
         collection.add(
@@ -43,12 +55,13 @@ def load_pdf(pdf_path):
 
 def query_document(collection_name, question, n_results=3):
     """Query the document and get LLM answer"""
+    client = get_client()
+    embedder = get_embedder()
+
     collection = client.get_collection(collection_name)
     
-    # Embed the question
     question_embedding = embedder.encode(question).tolist()
     
-    # Find relevant chunks
     results = collection.query(
         query_embeddings=[question_embedding],
         n_results=n_results
@@ -73,7 +86,6 @@ Answer:"""
     return response['message']['content']
 
 if __name__ == "__main__":
-    # Quick test
     pdf_path = input("Enter PDF path to test: ")
     collection_name, pages = load_pdf(pdf_path)
     print(f"Loaded {pages} pages")
