@@ -49,10 +49,10 @@ class RegionSelector:
         self.rect = self.canvas.create_rectangle(
             self.start_x, self.start_y,
             cur_x, cur_y,
-            outline='red', width=2
+            outline='red', width=2)
         
         
-    )
+        
     
 
 
@@ -69,9 +69,9 @@ class RegionSelector:
 
         screenshot = ImageGrab.grab(bbox=(x1, y1, x2, y2))
         
-        # Preprocessing for better OCR
-        screenshot = screenshot.convert('L')  # grayscale
-        screenshot = screenshot.point(lambda x: 0 if x < 140 else 255)  # contrast boost
+        
+        screenshot = screenshot.convert('L')  
+        screenshot = screenshot.point(lambda x: 0 if x < 140 else 255) 
         
         text = pytesseract.image_to_string(screenshot)
         return text

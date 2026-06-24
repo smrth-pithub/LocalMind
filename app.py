@@ -192,6 +192,8 @@ def on_quit(icon, item):
     icon.stop()
 
 def run_tray():
+
+    print("Creating tray icon...")
     icon = pystray.Icon(
         "LocalMind",
         create_icon(),
@@ -201,7 +203,10 @@ def run_tray():
             pystray.MenuItem("Quit", on_quit)
         )
     )
+    print("Running Tray...")
     icon.run()
+
+    print("Tray stopped.")
 
 def setup_hotkey():
     import keyboard
@@ -213,3 +218,7 @@ if __name__ == "__main__":
     print("Hotkey: Ctrl+Shift+Space to open")
     threading.Thread(target=setup_hotkey, daemon=True).start()
     run_tray()
+
+#if __name__ == "__main__":
+ #   print("LocalMind starting...")
+  #  open_window()   
