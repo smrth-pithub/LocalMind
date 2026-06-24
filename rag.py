@@ -3,6 +3,7 @@ from sentence_transformers import SentenceTransformer
 from pypdf import PdfReader
 import ollama
 import os
+from docx import Document as DocxDocument
 
 _embedder = None
 _client = None
@@ -52,6 +53,48 @@ def load_pdf(pdf_path):
     
     print(f"Loaded {len(chunks)} pages from {pdf_path}")
     return collection_name, len(chunks)
+
+def load_docx(docx_path):
+    """Load a DOCX and store chunks in ChromaDB"""
+    collection_name = os.path.basename(docx_path).replace('.', '_').replace(' ', '_')
+    
+    client = get_client()
+    embedder = get_embedder()
+
+    try:
+        client.delete_collection(collection_name)
+    except:
+        pass
+    
+    collection = client.create_collection(collection_name)
+    
+    doc = DocxDocument(docx_path)
+    chunks = []
+    current_chunk = ""
+    chunk_index = 0
+
+    for para in doc.paragraphs:
+        if para.text.strip():
+            current_chunk += para.text + "\n"
+            if len(current_chunk) > 1000:
+                chunks.append({"text": current_chunk, "index": chunk_index})
+                current_chunk = ""
+                chunk_index += 1
+
+    if current_chunk.strip():
+        chunks.append({"text": current_chunk, "index": chunk_index})
+
+    for chunk in chunks:
+        embedding = embedder.encode(chunk["text"]).tolist()
+        collection.add(
+            documents=[chunk["text"]],
+            embeddings=[embedding],
+            ids=[f"chunk_{chunk['index']}"],
+            metadatas=[{"index": chunk["index"]}]
+        )
+
+    print(f"Loaded {len(chunks)} chunks from {docx_path}")
+    return collection_name, len(chunks)    
 
 def query_document(collection_name, question, n_results=3):
     """Query the document and get LLM answer"""
