@@ -12,7 +12,7 @@ def get_embedder():
     global _embedder
     if _embedder is None:
         print("Loading embedding model...")
-        _embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        _embedder = SentenceTransformer('./models/all-MiniLM-L6-v2')
     return _embedder
 
 def get_client():
